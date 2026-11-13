@@ -30,6 +30,7 @@ The `examples/` folder holds a working reference implementation (vanilla JS clie
 2. **Decide the integration point**: where the script goes so it loads on *every* screen and role that should take comments, and survives the project's build. Read `references/architecture.md`.
 3. **Choose the backend.** Prefer what the project already has, and keep the same API contract whatever the store. Read `references/backend.md`.
 4. **Define the screen context.** Write the adapter that says who/what is being previewed and which screen is showing. This is the step most likely to go wrong. Read `references/context-detection.md`.
+   **Fast path (plain HTML on Netlify):** `node scripts/install.mjs <file.html> [--dir <deploy folder>] [--prod <live url>] [--app <id>] [--config '<json>']` inlines the layer between `<!-- prototype-comments:start/end -->` markers (re-running replaces it) and writes the function, `package.json` and `netlify.toml`. It never deploys. Use `--dry-run` first. Then still do steps 4 and 6: the installer can't know about role switchers that don't change the URL, modals/tabs without ARIA roles, or record deep links.
 5. **Adapt the frontend.** Start from `examples/frontend-example.js`. Adjust anchoring for the project's DOM, add the deep-link navigation hooks if the app has internal state, add touch input if reviewers use phones/tablets, and match colours if asked. Read `references/frontend.md`.
 6. **Test it properly**: add, view, delete and navigate, across two browsers/users and on touch devices. Read `references/testing.md` and run the checklist on the deployed URL, not only locally.
 7. **Report limitations** to the user in plain words, for example: no auth (anyone with the link can delete), iOS needs comment mode, comments made before a context change won't show, which screens couldn't be deep-linked.
@@ -50,6 +51,7 @@ The `examples/` folder holds a working reference implementation (vanilla JS clie
 - `references/backend.md`: API contract, Netlify Function + Blobs, alternatives, security
 - `references/context-detection.md`: building the screen context for roles, pages, language, tabs
 - `references/testing.md`: functional, cross-user, cross-browser and device checklist
+- `scripts/install.mjs`: one-command setup for a plain HTML prototype on Netlify (see the fast path in step 4)
 - `examples/frontend-example.js`: reference client (one IIFE, no dependencies, configured through `window.PROTO_COMMENTS`)
 - `examples/comments.mjs`: reference Netlify Function (GET / POST / DELETE on Netlify Blobs)
 - `examples/netlify/`: `package.json` and `netlify.toml` for the reference deploy

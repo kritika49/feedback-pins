@@ -30,6 +30,19 @@ For one project only, copy it into that project's `.claude/skills/` instead.
 
 Then ask something like *"add right-click comments to this prototype so the client can leave feedback"*.
 
+### One-command setup (plain HTML prototype on Netlify)
+
+```sh
+node prototype-commenting-system/scripts/install.mjs path/to/index.html --prod https://your-site.netlify.app
+cd path/to && npm install && netlify deploy --prod --dir . --functions netlify/functions
+```
+
+It adds the comment layer to the HTML (safe to re-run) and writes the Netlify function, `package.json` and `netlify.toml`. Pages, routes, tabs and modals that use standard markup work straight away. Role or person switchers that don't change the URL need a small `session()` setting; see `references/context-detection.md`.
+
+### Tests
+
+`prototype-commenting-system/examples/test/` runs 18 checks (modals, nested modals, tabs, routes, pages, jump-to-comment) in headless Chrome.
+
 ### Known limitations of the reference implementation
 
 - No authentication: anyone with the link can read, add and delete comments. Protect the site if the prototype is confidential.
