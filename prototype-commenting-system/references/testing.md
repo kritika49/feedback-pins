@@ -8,6 +8,18 @@ Test on the **deployed URL** (comments need the API). Use the browser automation
 - Every output that should have comments contains the layer (search built files for `data-cm-host` or your marker). In multi-app/role builds check each one.
 - The API responds: `curl <api>` → `[]` or a list; `curl -X POST -H 'Content-Type: application/json' -d '{"scroller":"html","author":"test","body":"hi"}' <api>` → `201`; delete that test comment afterwards.
 
+## Automated baseline
+
+`examples/test/` runs 18 checks in headless Chrome against a page with a modal, a nested modal, hidden tab panels, same-content tabs, two hash routes and a second page:
+
+```sh
+cd examples/test
+node server.mjs 8766 ../comments.mjs ../frontend-example.js &
+node run-tests.mjs 8766      # set CHROME=/path/to/chrome if needed
+```
+
+Run it after changing the client. For the real project, repeat the same scenarios on its own screens (manually or by adapting the runner).
+
 ## Functional
 
 1. Right-click a button, a table cell, a card, an icon (SVG) and empty page area → menu appears at the cursor; browser menu does not.
@@ -17,10 +29,13 @@ Test on the **deployed URL** (comments need the API). Use the browser automation
 5. Resize to tablet and phone widths → pin follows the element or its visible parent.
 6. Trigger a re-render (change a filter, open/close a drawer, sort a list) → pin finds its element again or hides; it is never shown on an unrelated element.
 7. Switch role/person, language, page and tab → pin hides on other screens and returns when you switch back.
-8. Open the list from another screen and click the comment → app returns to the right person, language, page, tab and record; element is scrolled into view, outlined and the thread is open.
-9. Delete from the popup → pin disappears for everyone after the next refresh.
-10. Escape and clicking elsewhere close menus and popups; the prototype's own clicks, keyboard shortcuts and forms still work while the layer is loaded.
-11. Network failure (offline in DevTools) → posting shows an error toast and keeps the typed text.
+8. Modals: comment inside a modal → pin is on the modal; close it → pin hidden; while a modal is open, page pins under it are hidden; same for a modal opened from a modal, drawers and dropdowns.
+9. Tabs: comment inside a tab → hidden on other tabs (including tabs that show the same layout/text), back when you return; content outside the tab panel is unaffected.
+10. Routes and pages: a comment on one route/page doesn't show on another with the same heading.
+11. Open the list from another screen and click the comment → app returns to the right person, language, page/route, tab and record, re-opens the modal (and its parent modal) it was in; element is scrolled into view, outlined and the thread is open. Repeat for a comment on another real page.
+12. Delete from the popup → pin disappears for everyone after the next refresh.
+13. Escape and clicking elsewhere close menus and popups; the prototype's own clicks, keyboard shortcuts and forms still work while the layer is loaded.
+14. Network failure (offline in DevTools) → posting shows an error toast and keeps the typed text.
 
 ## Across users and browsers
 

@@ -12,6 +12,9 @@
   //   session: function() -> {domain, person, role, lang}: who/what state is being previewed
   //   who:     function() -> short text naming the current preview (shown in the comment list)
   //   heading: CSS selector for the element whose text names the current screen
+  //   route:   function() -> string naming the current route (default: path + '#/…' hash routes)
+  //   layers:  extra CSS selector for modal-like layers (default covers dialog, role=dialog, aria-modal, popover)
+  //   tabs:    extra CSS selector for tab-like controls (default: [role=tab])
   //   legacyCtx: [domain, person, role, lang] the prototype opens in (only for comments without ctx)
   //   fabBottom: px from the bottom for the "Comments (N)" button
   var CFG = window.PROTO_COMMENTS || {};
@@ -114,15 +117,98 @@
     return r.width > 0 || r.height > 0;
   }
 
+  // ---------- Layers (modals, drawers, popovers) and tabs ----------
+  var LAYER_SEL = 'dialog[open], [role=dialog], [role=alertdialog], [aria-modal=true], [popover]' + (CFG.layers ? ', ' + CFG.layers : '');
+  var TAB_SEL = '[role=tab]' + (CFG.tabs ? ', ' + CFG.tabs : '');
+
+  function layerOf(n) {
+    var e = n && n.nodeType === 1 ? n : n && n.parentElement;
+    try { return e ? e.closest(LAYER_SEL) : null; } catch (x) { return null; }
+  }
+
+  function isOn(e) {
+    return e.getAttribute('aria-selected') === 'true' || e.getAttribute('aria-pressed') === 'true' || /(^|\s)(is-on|active|selected)(\s|$)/.test(e.className || '');
+  }
+
+  function tabLabel(e) {
+    return textOf(e).replace(/\s*\d+$/, '').slice(0, 40);
+  }
+
+  function tabsAll() {
+    var out = [];
+    try { document.querySelectorAll(TAB_SEL).forEach(function(e) { if (!host.contains(e)) out.push(e); }); } catch (x) {}
+    return out;
+  }
+  // Labels of the selected tabs that control the area this element is in: the tab's aria-controls panel, a
+  // role=tabpanel next to its tab list, or else the first visible element after the tab list (its panel).
+  // Content further down the page and unrelated toggles are not tied to the tab.
+  function tabsFor(target) {
+    var out = [];
+    tabsAll().forEach(function(t) {
+      if (!isOn(t) || out.length >= 6) return;
+      var panel = t.getAttribute('aria-controls') && document.getElementById(t.getAttribute('aria-controls'));
+      var gov = false;
+      if (panel) gov = panel.contains(target);
+      else {
+        var list = t.closest('[role=tablist]') || t.parentElement;
+        if (list && !list.contains(target)) {
+          var first = true;
+          for (var sib = list.nextElementSibling; sib; sib = sib.nextElementSibling) {
+            if (sib.matches('[role=tablist]') || sib.querySelector('[role=tablist]')) break;
+            var isPanel = sib.matches('[role=tabpanel]');
+            if ((first || isPanel) && sib.contains(target)) { gov = true; break; }
+            if (sized(sib) && !isPanel) first = false;
+          }
+        }
+      }
+      if (gov) out.push(tabLabel(t));
+    });
+    return out;
+  }
+
+  function tabsOnNow() {
+    var on = {};
+    tabsAll().forEach(function(t) { if (isOn(t) && sized(t)) on[tabLabel(t)] = 1; });
+    return on;
+  }
+  // The route: path plus hash routes ('#/…', '#!…'); plain '#section' anchors are not a different screen.
+  function routeNow() {
+    try { if (CFG.route) return String(CFG.route() || ''); } catch (e) {}
+    return location.pathname + (/^#[\/!]/.test(location.hash) ? location.hash : '');
+  }
+  // Context = domain|person|role|lang|heading|route. Comments saved without the route part match any route.
+  function ctxMatch(a, b) {
+    if (!a || !b) return false;
+    var x = a.split('|'), y = b.split('|');
+    if (x.slice(0, 5).join('|') !== y.slice(0, 5).join('|')) return false;
+    return x.length < 6 || y.length < 6 || x[5] === y[5];
+  }
+
+  // Something drawn over the spot (a modal backdrop, a drawer, a dropdown) hides the pin underneath.
+  function uncovered(x, y, n, c) {
+    var px = Math.min(Math.max(x + 2, 0), window.innerWidth - 1), py = Math.min(Math.max(y + 2, 0), window.innerHeight - 1);
+    var top = document.elementsFromPoint(px, py).filter(function(e) { return e !== host && !host.contains(e); })[0];
+    if (!top) return true;
+    if (n) return n.contains(top) || top.contains(n);
+    return !!layerOf(top) === !!c.inLayer;
+  }
+
   function findEl(c) {
     if (!c.selector) return null;
     var n = q(c.selector);
     var textOk = function(e) {
       return !c.snippet || snip(e).indexOf(c.snippet.slice(0, 24)) === 0 || c.snippet.indexOf(snip(e)) === 0;
     };
-    if (n && textOk(n)) {
+    // A comment made in a modal only matches elements in a modal, and a page comment never matches modal content.
+    var layerOk = function(e) {
+      return !!layerOf(e) === !!c.inLayer;
+    };
+    if (n && textOk(n) && layerOk(n)) {
       if (sized(n)) return n;
-      // Same element, but hidden at this window size (responsive layout): use its nearest visible parent.
+      // Hidden. If the window is a different size than when the comment was made, this is probably a responsive
+      // layout hiding it, so use its nearest visible parent. At the same size it's a closed tab, modal or panel:
+      // show nothing rather than pin the comment on the wrong thing.
+      if (Math.abs(window.innerWidth - (c.vw || window.innerWidth)) < 120) return null;
       var up = n.parentElement;
       while (up && up !== document.body && !sized(up)) up = up.parentElement;
       if (up && up !== document.body && up !== document.documentElement) return up;
@@ -131,7 +217,7 @@
     if (c.tag && c.snippet && c.snippet.length >= 4) {
       var all = document.getElementsByTagName(c.tag);
       for (var i = 0; i < all.length; i++)
-        if (!host.contains(all[i]) && sized(all[i]) && snip(all[i]).indexOf(c.snippet.slice(0, 24)) === 0) return all[i];
+        if (!host.contains(all[i]) && sized(all[i]) && layerOk(all[i]) && snip(all[i]).indexOf(c.snippet.slice(0, 24)) === 0) return all[i];
     }
     var norm = function(s) {
       return (s || '').replace(/[0-9]+/g, '').replace(/[·•|]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -143,7 +229,7 @@
         list = document.getElementsByTagName(c.tag);
       for (var j = 0; j < list.length; j++) {
         var e = list[j];
-        if (host.contains(e) || !sized(e)) continue;
+        if (host.contains(e) || !sized(e) || !layerOk(e)) continue;
         var tx = norm(textOf(e));
         if (tx.indexOf(key) !== 0) continue;
         if (tx.length < bl) {
@@ -183,7 +269,7 @@
 
   function ctxNow() {
     var s = sessionNow();
-    return [s.domain, s.person, s.role, s.lang, headingNow()].join('|');
+    return [s.domain, s.person, s.role, s.lang, headingNow(), routeNow()].join('|');
   }
   // The visible tab / view toggles (Board, List, ...): only needed for comments not tied to an element.
   function sigNow() {
@@ -210,7 +296,11 @@
   }
   // Where is this comment right now, in viewport coordinates? null = not on this screen.
   function locate(c) {
-    if (c.id !== forced && (!ctxOf(c) || ctxOf(c) !== currentCtx)) return null; // other role, language or page: never shown here
+    if (c.id !== forced && !ctxMatch(ctxOf(c), currentCtx)) return null; // other role, language, page or route: never shown here
+    if (c.id !== forced && c.tabs && c.tabs.length) { // made under a tab that is not selected now
+      for (var k = 0; k < c.tabs.length; k++)
+        if (!currentTabs[c.tabs[k]]) return null;
+    }
     var n = findEl(c),
       x, y, clip = n;
     if (n) {
@@ -238,7 +328,7 @@
       y: y,
       el: n,
       clip: clip,
-      visible: inView(x, y, clip)
+      visible: inView(x, y, clip) && (c.id === forced && !n ? true : uncovered(x, y, n, c))
     };
   }
   // A pin must not float over the header or outside a scrolling area once its spot has scrolled out of sight.
@@ -298,6 +388,7 @@
   root.appendChild(pinLayer);
   var currentCtx = '',
     currentSig = '',
+    currentTabs = {},
     goingTo = false;
 
   function render() {
@@ -305,6 +396,7 @@
     var prev = currentCtx;
     currentCtx = ctxNow();
     currentSig = sigNow();
+    currentTabs = tabsOnNow();
     if (prev && prev !== currentCtx && !goingTo) {
       forced = null;
       closeAll();
@@ -468,7 +560,7 @@
       who.appendChild(el('span', 'ts', fmt(c.ts)));
       b.appendChild(who);
       b.appendChild(el('div', 'txt', c.body));
-      var here = ctxOf(c) && ctxOf(c) === currentCtx;
+      var here = ctxMatch(ctxOf(c), currentCtx);
       b.appendChild(el('div', 'meta', (c.label ? 'On: ' + c.label + ' · ' : '') + 'Screen: ' + whereName(c) + (here ? '' : ' (not the screen you are on)')));
       if (!here) b.style.opacity = '0.75';
       b.onclick = function() {
@@ -495,6 +587,14 @@
         return true;
       }
     return false;
+  }
+
+  function clickTabs(labels) {
+    (labels || []).forEach(function(lb) {
+      var all = tabsAll();
+      for (var i = 0; i < all.length; i++)
+        if (tabLabel(all[i]) === lb && !isOn(all[i]) && sized(all[i])) { all[i].click(); break; }
+    });
   }
 
   function goTo(c) {
@@ -529,10 +629,15 @@
           });
           await wait(150);
         }
+        if (c.path && c.path !== location.pathname) { // 3a. another page of the site: load it, then continue there
+          try { sessionStorage.setItem('cm-go', c.id); } catch (e) {}
+          location.href = c.path + (c.view || '');
+          return;
+        }
         if (c.view && location.hash !== c.view) {
           location.hash = c.view;
           await wait(600);
-        } // 3. same page
+        } // 3b. same route
         if (c.nav && api) {
           api.nav({
             page: c.nav.page,
@@ -548,7 +653,18 @@
           });
           await wait(500);
         }
-        (c.sig || '').split('|').filter(Boolean).forEach(function(lb) { // 4. same tab
+        clickTabs(c.tabs); // 4. the tabs it was made under
+        if (c.openers && c.openers.length && !findEl(c)) { // 5. reopen the modal(s) it was made in, outermost first
+          for (var o = 0; o < c.openers.length; o++) {
+            var op = findEl(c.openers[o]);
+            if (!op) break;
+            op.click();
+            await wait(500);
+          }
+          clickTabs(c.tabs); // tabs inside the modal
+          await wait(300);
+        }
+        (c.sig || '').split('|').filter(Boolean).forEach(function(lb) { // 6. same view toggles (page-area comments)
           var all = document.querySelectorAll('main [role=tab], main .nv-tab, main .nv-jt-tab, main .seg > button, main .chip');
           for (var i = 0; i < all.length; i++) {
             var e = all[i],
@@ -560,7 +676,7 @@
           }
         });
         await wait(400);
-        for (var i = 0; i < 10 && ctxNow() !== ctxOf(c) && !findEl(c); i++) await wait(150);
+        for (var i = 0; i < 10 && !ctxMatch(ctxNow(), ctxOf(c)) && !findEl(c); i++) await wait(150);
       } finally {
         goingTo = false;
       }
@@ -573,10 +689,10 @@
         block: 'center',
         inline: 'center'
       });
-      else if (ctxNow() === ctxOf(c) && sc && sc !== document.documentElement) {
+      else if (ctxMatch(ctxNow(), ctxOf(c)) && sc && sc !== document.documentElement) {
         sc.scrollTop = Math.max(0, c.sy - sc.clientHeight / 2);
         sc.scrollLeft = Math.max(0, c.sx - sc.clientWidth / 2);
-      } else if (ctxNow() === ctxOf(c) && sc) window.scrollTo(Math.max(0, c.sx - innerWidth / 2), Math.max(0, c.sy - innerHeight / 2));
+      } else if (ctxMatch(ctxNow(), ctxOf(c)) && sc) window.scrollTo(Math.max(0, c.sx - innerWidth / 2), Math.max(0, c.sy - innerHeight / 2));
       await wait(200);
       if (locate(c)) {
         openThread(c.id);
@@ -634,8 +750,21 @@
       ctx: currentCtx,
       sig: currentSig,
       ctxLabel: ctxLabelNow(),
-      scroller: pathOf(scroller)
+      scroller: pathOf(scroller),
+      path: location.pathname,
+      vw: window.innerWidth,
+      tabs: tabsFor(target)
     };
+    var layer = layerOf(target);
+    if (layer) { // made inside a modal: remember the clicks that opened it (and any modal it was opened from)
+      d.inLayer = 1;
+      d.openers = [];
+      for (var h = clicks.length - 1, L = layer; h >= 0 && L && d.openers.length < 4; h--) {
+        if (L.contains(clicks[h].el)) continue;
+        d.openers.unshift(clicks[h].d);
+        L = clicks[h].layer;
+      }
+    }
     if (scroller === document.documentElement) {
       d.sx = cx + window.scrollX;
       d.sy = cy + window.scrollY;
@@ -729,6 +858,14 @@
     check();
   }
   // ---------- Upkeep ----------
+  // Recent clicks, so a comment made in a modal knows which button opened it.
+  var clicks = [];
+  document.addEventListener('click', function(e) {
+    if (e.composedPath().indexOf(host) !== -1 || !e.target || e.target.nodeType !== 1) return;
+    var t = e.target.closest('button, a, [role=button], [role=tab], [role=menuitem], summary, label, input, select') || e.target;
+    clicks.push({ el: t, layer: layerOf(t), d: { selector: pathOf(t), tag: t.tagName.toLowerCase(), snippet: snip(t), inLayer: layerOf(t) ? 1 : 0, vw: window.innerWidth } });
+    if (clicks.length > 30) clicks.shift();
+  }, true);
   document.addEventListener('mousedown', function(e) {
     if (e.button === 2 || e.composedPath().indexOf(host) !== -1) return;
     closeAll();
@@ -759,5 +896,10 @@
   })();
   setInterval(load, 8000);
   renderPanel();
-  load();
+  load().then(function() { // finish a "go to comment" that had to load another page first
+    var id = null;
+    try { id = sessionStorage.getItem('cm-go'); sessionStorage.removeItem('cm-go'); } catch (e) {}
+    var c = id && comments.filter(function(x) { return x.id === id; })[0];
+    if (c) setTimeout(function() { goTo(c); }, 300);
+  });
 })();

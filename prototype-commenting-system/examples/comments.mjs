@@ -23,6 +23,11 @@ export default async (req) => {
     try { b = await req.json(); } catch { return json({ error: "bad json" }, 400); }
     const str = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
     const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+    const list = (v, n, len) => (Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, n).map((x) => x.slice(0, len)) : []);
+    const anchor = (a) => ({ selector: str(a && a.selector, 2000), tag: str(a && a.tag, 30), snippet: str(a && a.snippet, 40), inLayer: a && a.inLayer ? 1 : 0, vw: num(a && a.vw) });
+    // App state from __protoNav.snap(): kept only if it is a small plain object.
+    let nav = null;
+    if (b.nav && typeof b.nav === "object" && !Array.isArray(b.nav)) { const j = JSON.stringify(b.nav); if (j.length <= 2000) nav = JSON.parse(j); }
     const c = {
       id: crypto.randomUUID(),
       view: str(b.view, 200),
@@ -39,6 +44,12 @@ export default async (req) => {
       ctx: str(b.ctx, 300),
       ctxLabel: str(b.ctxLabel, 160),
       sig: str(b.sig, 200),
+      path: str(b.path, 300),
+      vw: num(b.vw),
+      tabs: list(b.tabs, 6, 40),
+      inLayer: b.inLayer ? 1 : 0,
+      openers: Array.isArray(b.openers) ? b.openers.slice(0, 4).map(anchor) : [],
+      nav,
       author: str(b.author, 60),
       body: str(b.body, 2000),
       ts: Date.now(),

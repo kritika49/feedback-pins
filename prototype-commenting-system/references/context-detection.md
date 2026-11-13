@@ -4,10 +4,12 @@ A pin should show only where it was made. The URL is rarely enough: role switche
 
 ## The context key
 
-The reference builds `ctx = [domain, person, role, lang, heading].join('|')` and a separate `sig` of active tab labels.
+The reference builds `ctx = [domain, person, role, lang, heading, route].join('|')`, plus per comment the `tabs` that control the element and a `sig` of active toggles (for page-area comments). Comments saved without the route part (older data) match any route.
 
 - `session()` (from config) supplies domain/person/role/lang: whatever defines *whose view* is being previewed.
 - `heading` is the visible page title (first `main h1`, `h1`, `main h2`, `h2`, or a configured selector), cut to 60 chars.
+- `route` is `location.pathname` plus hash routes (`#/…`, `#!…`); plain `#section` anchors are ignored. Override with `route()` when the app keeps the route elsewhere (e.g. in a store) or when the path contains volatile parts.
+- Tabs and modals are deliberately **not** in `ctx`: opening a modal or switching a tab doesn't hide every comment on the page, only the ones tied to them (see frontend.md, Layers and Tabs).
 - `sig` is the text of up to 8 elements under `main` that are `.is-on`, `[aria-selected=true]` or `[aria-pressed=true]`. It is only required to match for comments on empty page area; element-anchored comments rely on finding the element.
 
 ## How to find the right inputs

@@ -42,11 +42,14 @@
 | `scroller`, `sx`, `sy` | fallback anchor: CSS path of nearest scroll container + position inside its content |
 | `ctx`, `ctxLabel` | screen context key and its readable name |
 | `sig` | labels of the active tabs/toggles, used when there's no element anchor |
-| `view` | `location.hash` (or path) at creation |
+| `view`, `path` | `location.hash` and `location.pathname` at creation |
+| `vw` | window width at creation (decides whether a hidden element is a responsive change or a closed panel) |
+| `inLayer`, `openers` | made inside a modal/drawer/popover; descriptors of the clicks that opened it, outermost first |
+| `tabs` | labels of the selected tabs controlling the element |
 | `nav` | app state from `__protoNav.snap()`, replayed by `nav()` |
 | `app` | which app/role build it was made in (multi-app setups) |
 
-Add fields if a project needs them (e.g. `status: open/resolved`, `replies`, `screenshot`), and whitelist them in the API.
+Add fields if a project needs them (e.g. `status: open/resolved`, `replies`, `screenshot`), and **whitelist them in the API**: the reference function drops unknown fields silently, so a field the client sends but the server doesn't list (an early version dropped `nav`) looks like it works until the page is reloaded.
 
 ## Integration patterns
 

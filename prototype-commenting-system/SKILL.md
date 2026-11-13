@@ -12,8 +12,9 @@ The `examples/` folder holds a working reference implementation (vanilla JS clie
 ## What a finished integration does
 
 - Right-click (desktop) or long-press / comment mode (touch) on any element → "Comment" → name + text → a numbered pin anchored to that element.
-- Pins follow their element through scrolling, resizing and re-renders, and only appear on the screen they were made on (same role/person, language, page, tab).
-- A "Comments (N)" button lists every comment, marks ones made on other screens, and clicking one restores that screen, scrolls to the spot and opens it.
+- Pins follow their element through scrolling, resizing and re-renders, and only appear on the screen they were made on (same role/person, language, page, route, tab).
+- A comment made in a modal, drawer or popover sits on that layer: it shows only while that layer is open, and page pins underneath are hidden while something covers them.
+- A "Comments (N)" button lists every comment, marks ones made on other screens, and clicking one restores that screen (page, route, role, tabs, and the modal it was in, re-opened through the same buttons), scrolls to the spot and opens it.
 - Comments are stored in a shared backend, refresh for everyone without a reload, and can be deleted.
 - The layer can't be broken by the prototype's CSS and doesn't break the prototype (Shadow DOM, capture-phase listeners, no changes to app markup required).
 
@@ -52,3 +53,4 @@ The `examples/` folder holds a working reference implementation (vanilla JS clie
 - `examples/frontend-example.js`: reference client (one IIFE, no dependencies, configured through `window.PROTO_COMMENTS`)
 - `examples/comments.mjs`: reference Netlify Function (GET / POST / DELETE on Netlify Blobs)
 - `examples/netlify/`: `package.json` and `netlify.toml` for the reference deploy
+- `examples/test/`: a test page with modals, nested modals, tabs, routes and a second page, a server that runs the real `comments.mjs`, and a headless-Chrome runner with 18 checks. Use it after changing the client, and as a model for testing the real project.

@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>CM test</title>
+<style>body{font:14px system-ui;margin:0}main{padding:20px}nav a{margin-right:10px}
+[role=tab][aria-selected=true]{font-weight:700;border-bottom:2px solid #000}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+.dlg{background:#fff;padding:20px;width:360px;border-radius:8px}.hidden{display:none}
+.card{border:1px solid #ccc;padding:10px;margin:8px 0}</style></head><body>
+<header><nav><a href="#/a">Route A</a><a href="#/b">Route B</a><a href="/p2">Page 2 (real page)</a></nav></header>
+<main><h1 id="title">Dashboard</h1>
+<p id="routeinfo"></p>
+<div role="tablist" id="tabsH"><button role="tab" aria-selected="true" data-t="h1">Hidden-tab One</button><button role="tab" aria-selected="false" data-t="h2">Hidden-tab Two</button></div>
+<section id="panel-h1" class="card"><div class="card">Panel one unique text</div></section>
+<section id="panel-h2" class="card hidden"><div class="card">Panel two unique text</div></section>
+<div role="tablist" id="tabsU"><button role="tab" aria-selected="true">Same One</button><button role="tab" aria-selected="false">Same Two</button></div>
+<div id="samepanel" class="card"><table><tr><th>Status</th><th>Owner</th></tr><tr><td id="sameval">row</td><td>x</td></tr></table></div>
+<button id="openM">Open settings modal</button>
+<div class="card" id="under">Under the modal card</div>
+</main>
+<div id="modalRoot"></div>
+<script>
+function tabs(id,on){document.querySelectorAll('#'+id+' [role=tab]').forEach(function(b){b.onclick=function(){document.querySelectorAll('#'+id+' [role=tab]').forEach(function(x){x.setAttribute('aria-selected',x===b)});on(b)}})}
+tabs('tabsH',function(b){document.getElementById('panel-h1').classList.toggle('hidden',b.dataset.t!=='h1');document.getElementById('panel-h2').classList.toggle('hidden',b.dataset.t!=='h2')});
+tabs('tabsU',function(b){document.getElementById('sameval').textContent=b.textContent==='Same One'?'row':'row'});
+function route(){var r=location.hash||'#/a';document.getElementById('routeinfo').textContent='Route content '+r+(location.pathname.indexOf('p2')>=0?' on page2':'')}
+addEventListener('hashchange',route);route();
+var mr=document.getElementById('modalRoot');
+document.getElementById('openM').onclick=function(){
+ mr.innerHTML='<div class="backdrop"><div class="dlg" role="dialog" aria-modal="true"><h2>Settings</h2><p class="card">Modal body text here</p><button id="openN">Open nested</button> <button id="closeM">Close</button></div></div>';
+ document.getElementById('closeM').onclick=function(){mr.innerHTML=''};
+ document.getElementById('openN').onclick=function(){var n=document.createElement('div');n.className='backdrop';n.innerHTML='<div class="dlg" role="dialog" aria-modal="true"><h2>Nested</h2><p class="card">Nested modal text</p><button id="closeN">Close nested</button></div>';mr.appendChild(n);document.getElementById('closeN').onclick=function(){n.remove()}};
+};
+</script>
+<script>window.PROTO_COMMENTS={api:'/api/comments'};</script>
+<script src="/cm.js"></script>
+</body></html>
