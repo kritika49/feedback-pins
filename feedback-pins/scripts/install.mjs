@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// One-command Netlify setup for prototype comments.
+// Feedback Pins: one-command Netlify setup.
 //
 //   node install.mjs <prototype.html> [options]
 //
 // What it does:
 //   1. Inlines the comment layer (examples/frontend-example.js + a config block) into the HTML, just before
-//      </body>, between <!-- prototype-comments:start/end --> markers. Running it again replaces that block,
+//      </body>, between <!-- feedback-pins:start/end --> markers. Running it again replaces that block,
 //      so it is safe to re-run after updating the skill.
 //   2. Writes netlify/functions/comments.mjs, and creates or updates package.json (@netlify/blobs) and
 //      netlify.toml in the deploy folder.
@@ -25,7 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EX = path.join(HERE, '..', 'examples');
-const START = '<!-- prototype-comments:start -->', END = '<!-- prototype-comments:end -->';
+const START = '<!-- feedback-pins:start -->', END = '<!-- feedback-pins:end -->';
+const OLD = [['<!-- prototype-comments:start -->', '<!-- prototype-comments:end -->']]; // earlier name, still replaced
 
 const args = process.argv.slice(2);
 const WITH_VALUE = ['--dir', '--prod', '--app', '--config'], opts = {};
@@ -56,6 +57,7 @@ client = client.replace(/<\/script/gi, '<\\/script'); // must not end the inline
 const block = `${START}\n<script>window.PROTO_COMMENTS = Object.assign(${JSON.stringify(cfg)}, window.PROTO_COMMENTS || {});</script>\n<script>\n${client}\n</script>\n${END}`;
 
 let page = fs.readFileSync(html, 'utf8');
+for (const [a, b] of OLD) if (page.includes(a) && page.includes(b)) page = page.replace(a, START).replace(b, END);
 const had = page.includes(START);
 if (had) {
   const a = page.indexOf(START), b = page.indexOf(END);
@@ -72,7 +74,7 @@ const changes = [`${had ? 'updated' : 'added'} comment layer in ${html}`];
 const writes = [[path.join(dir, 'netlify', 'functions', 'comments.mjs'), fs.readFileSync(path.join(EX, 'comments.mjs'), 'utf8')]];
 
 const pkgPath = path.join(dir, 'package.json');
-let pkg = { name: 'prototype-comments', private: true, type: 'module', dependencies: {} };
+let pkg = { name: 'feedback-pins', private: true, type: 'module', dependencies: {} };
 if (fs.existsSync(pkgPath)) { try { pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); } catch { fail(`${pkgPath} is not valid JSON`); } }
 pkg.dependencies = pkg.dependencies || {};
 const blobsVer = JSON.parse(fs.readFileSync(path.join(EX, 'netlify', 'package.json'), 'utf8')).dependencies['@netlify/blobs'];

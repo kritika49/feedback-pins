@@ -1,4 +1,4 @@
-/* prototype-comments: right-click "Comment" pins for any HTML prototype.
+/* Feedback Pins: right-click "Comment" pins for any HTML prototype.
  * Comments are stored by the Netlify function in examples/comments.mjs
  * (Netlify Blobs) and shared by everyone who opens the same site.
  * Optional: window.__protoNav = { snap(), nav(state), switchPerson(person, domain) } lets the
